@@ -1,59 +1,355 @@
-# DataCo Supply Chain & Delivery Performance Dashboard Specification
+// ================================================================
+// DATACO SUPPLY CHAIN & DELIVERY PERFORMANCE DASHBOARD
+// COMPLETE DAX PACKAGE
+// ================================================================
 
-## 1. Data Model Setup
-- **Source Table**: `clean_dataco_supply_chain.csv` (Renamed to `dataco_shipments`)
-- **Primary Key**: `order_id` / `order_item_id`
-- **Fact Table Metrics**:
-  - `sales_per_customer` (Decimal / Currency)
-  - `order_profit_per_order` (Decimal / Currency)
-  - `benefit_per_order` (Decimal / Currency)
-  - `order_item_quantity` (Whole Number)
-  - `days_for_shipping_real` (Whole Number)
-  - `days_for_shipment_scheduled` (Whole Number)
-  - `late_delivery_risk` (Binary Whole Number: 1 = Late Risk, 0 = On Time)
 
----
+// ================================================================
+// 1. CREATE DEDICATED MEASURES TABLE
+// ================================================================
 
-## 2. Production DAX Measures
-Create a dedicated measures table named `_Measures` and insert the following calculations:
+_Measures =
+DATATABLE(
+    "Measure Group", STRING,
+    {
+        {"Supply Chain & Delivery Performance"}
+    }
+)
 
-```dax
--- Total Order Volume
-Total Orders = COUNTROWS('dataco_shipments')
 
--- Total Sales Revenue
-Total Sales = SUM('dataco_shipments'[sales_per_customer])
+// ================================================================
+// 2. CORE KPI MEASURES
+// ================================================================
 
--- Total Profit
-Total Profit = SUM('dataco_shipments'[order_profit_per_order])
+Total Orders =
+COUNTROWS('dataco_shipments')
 
--- Late Delivery Shipments Count
-Late Shipments = CALCULATE(
+
+Total Sales =
+SUM('dataco_shipments'[sales_per_customer])
+
+
+Total Profit =
+SUM('dataco_shipments'[order_profit_per_order])
+
+
+Total Benefit =
+SUM('dataco_shipments'[benefit_per_order])
+
+
+Total Order Item Quantity =
+SUM('dataco_shipments'[order_item_quantity])
+
+
+Late Shipments =
+CALCULATE(
     COUNTROWS('dataco_shipments'),
     'dataco_shipments'[late_delivery_risk] = 1
 )
 
--- On-Time Shipments Count
-On Time Shipments = CALCULATE(
+
+On Time Shipments =
+CALCULATE(
     COUNTROWS('dataco_shipments'),
     'dataco_shipments'[late_delivery_risk] = 0
 )
 
--- Late Delivery Risk Rate %
-Late Delivery Rate % = 
+
+Late Delivery Rate % =
 DIVIDE(
     [Late Shipments],
     [Total Orders],
     0
 ) * 100
 
--- On-Time Fulfillment Rate %
-On Time Fulfillment Rate % = 
+
+On Time Fulfillment Rate % =
 DIVIDE(
     [On Time Shipments],
     [Total Orders],
     0
 ) * 100
 
--- Average Profit Margin
-Avg Profit Margin = DIVIDE([Total Profit], [Total Sales], 0) * 100
+
+Avg Profit Margin =
+DIVIDE(
+    [Total Profit],
+    [Total Sales],
+    0
+) * 100
+
+
+
+// ================================================================
+// 3. ADDITIONAL PERFORMANCE MEASURES
+// ================================================================
+
+Avg Sales per Order =
+DIVIDE(
+    [Total Sales],
+    [Total Orders],
+    0
+)
+
+
+Avg Profit per Order =
+DIVIDE(
+    [Total Profit],
+    [Total Orders],
+    0
+)
+
+
+Avg Benefit per Order =
+DIVIDE(
+    [Total Benefit],
+    [Total Orders],
+    0
+)
+
+
+Avg Shipping Days =
+AVERAGE(
+    'dataco_shipments'[days_for_shipping_real]
+)
+
+
+Avg Scheduled Shipping Days =
+AVERAGE(
+    'dataco_shipments'[days_for_shipment_scheduled]
+)
+
+
+Avg Shipping Delay Days =
+AVERAGEX(
+    'dataco_shipments',
+    'dataco_shipments'[days_for_shipping_real]
+        - 'dataco_shipments'[days_for_shipment_scheduled]
+)
+
+
+Total Shipping Delay Days =
+SUMX(
+    'dataco_shipments',
+    'dataco_shipments'[days_for_shipping_real]
+        - 'dataco_shipments'[days_for_shipment_scheduled]
+)
+
+
+
+// ================================================================
+// 4. DELIVERY STATUS
+// ================================================================
+
+// Calculated column — create this under dataco_shipments
+Delivery Status =
+IF(
+    'dataco_shipments'[late_delivery_risk] = 1,
+    "Late",
+    "On Time"
+)
+
+
+
+// ================================================================
+// 5. DELIVERY PERFORMANCE
+// ================================================================
+
+Late Shipment % =
+DIVIDE(
+    [Late Shipments],
+    [Total Orders],
+    0
+)
+
+
+On Time Shipment % =
+DIVIDE(
+    [On Time Shipments],
+    [Total Orders],
+    0
+)
+
+
+Orders at Risk =
+[Late Shipments]
+
+
+Successful Deliveries =
+[On Time Shipments]
+
+
+Delayed Deliveries =
+[Late Shipments]
+
+
+Delivery Performance Gap % =
+100 - [On Time Fulfillment Rate %]
+
+
+
+// ================================================================
+// 6. STATUS-SPECIFIC SALES & PROFIT
+// ================================================================
+
+On Time Sales =
+CALCULATE(
+    [Total Sales],
+    'dataco_shipments'[late_delivery_risk] = 0
+)
+
+
+Late Shipment Sales =
+CALCULATE(
+    [Total Sales],
+    'dataco_shipments'[late_delivery_risk] = 1
+)
+
+
+On Time Profit =
+CALCULATE(
+    [Total Profit],
+    'dataco_shipments'[late_delivery_risk] = 0
+)
+
+
+Late Shipment Profit =
+CALCULATE(
+    [Total Profit],
+    'dataco_shipments'[late_delivery_risk] = 1
+)
+
+
+On Time Profit Margin % =
+DIVIDE(
+    [On Time Profit],
+    [On Time Sales],
+    0
+) * 100
+
+
+Late Shipment Profit Margin % =
+DIVIDE(
+    [Late Shipment Profit],
+    [Late Shipment Sales],
+    0
+) * 100
+
+
+
+// ================================================================
+// 7. SHIPPING / PROFIT ANALYSIS
+// ================================================================
+
+Profit per Shipping Day =
+DIVIDE(
+    [Total Profit],
+    [Avg Shipping Days],
+    0
+)
+
+
+Sales per Shipping Day =
+DIVIDE(
+    [Total Sales],
+    [Avg Shipping Days],
+    0
+)
+
+
+
+// ================================================================
+// 8. DATE TABLE
+// ================================================================
+
+// IMPORTANT:
+// Replace [order_date] below with the actual date column
+// in your dataco_shipments table if it has a different name.
+
+DateTable =
+ADDCOLUMNS(
+    CALENDAR(
+        MIN('dataco_shipments'[order_date]),
+        MAX('dataco_shipments'[order_date])
+    ),
+    "Year",
+        YEAR([Date]),
+    "Month Number",
+        MONTH([Date]),
+    "Month",
+        FORMAT([Date], "MMM"),
+    "Month Year",
+        FORMAT([Date], "MMM YYYY"),
+    "Year Month Sort",
+        YEAR([Date]) * 100 + MONTH([Date])
+)
+
+
+
+// ================================================================
+// 9. MONTHLY MEASURES
+// ================================================================
+
+Monthly Sales =
+[Total Sales]
+
+
+Monthly Profit =
+[Total Profit]
+
+
+Monthly Orders =
+[Total Orders]
+
+
+Monthly Late Shipments =
+[Late Shipments]
+
+
+Monthly On Time Shipments =
+[On Time Shipments]
+
+
+Monthly Late Delivery Rate % =
+[Late Delivery Rate %]
+
+
+Monthly On Time Fulfillment Rate % =
+[On Time Fulfillment Rate %]
+
+
+
+// ================================================================
+// 10. ADDITIONAL KPI MEASURES
+// ================================================================
+
+Profit per Order =
+DIVIDE(
+    [Total Profit],
+    [Total Orders],
+    0
+)
+
+
+Sales per Order =
+DIVIDE(
+    [Total Sales],
+    [Total Orders],
+    0
+)
+
+
+Benefit per Order =
+DIVIDE(
+    [Total Benefit],
+    [Total Orders],
+    0
+)
+
+
+Profit Contribution % =
+DIVIDE(
+    [Total Profit],
+    [Total Sales],
+    0
+) * 100
