@@ -1,0 +1,59 @@
+# DataCo Supply Chain & Delivery Performance Dashboard Specification
+
+## 1. Data Model Setup
+- **Source Table**: `clean_dataco_supply_chain.csv` (Renamed to `dataco_shipments`)
+- **Primary Key**: `order_id` / `order_item_id`
+- **Fact Table Metrics**:
+  - `sales_per_customer` (Decimal / Currency)
+  - `order_profit_per_order` (Decimal / Currency)
+  - `benefit_per_order` (Decimal / Currency)
+  - `order_item_quantity` (Whole Number)
+  - `days_for_shipping_real` (Whole Number)
+  - `days_for_shipment_scheduled` (Whole Number)
+  - `late_delivery_risk` (Binary Whole Number: 1 = Late Risk, 0 = On Time)
+
+---
+
+## 2. Production DAX Measures
+Create a dedicated measures table named `_Measures` and insert the following calculations:
+
+```dax
+-- Total Order Volume
+Total Orders = COUNTROWS('dataco_shipments')
+
+-- Total Sales Revenue
+Total Sales = SUM('dataco_shipments'[sales_per_customer])
+
+-- Total Profit
+Total Profit = SUM('dataco_shipments'[order_profit_per_order])
+
+-- Late Delivery Shipments Count
+Late Shipments = CALCULATE(
+    COUNTROWS('dataco_shipments'),
+    'dataco_shipments'[late_delivery_risk] = 1
+)
+
+-- On-Time Shipments Count
+On Time Shipments = CALCULATE(
+    COUNTROWS('dataco_shipments'),
+    'dataco_shipments'[late_delivery_risk] = 0
+)
+
+-- Late Delivery Risk Rate %
+Late Delivery Rate % = 
+DIVIDE(
+    [Late Shipments],
+    [Total Orders],
+    0
+) * 100
+
+-- On-Time Fulfillment Rate %
+On Time Fulfillment Rate % = 
+DIVIDE(
+    [On Time Shipments],
+    [Total Orders],
+    0
+) * 100
+
+-- Average Profit Margin
+Avg Profit Margin = DIVIDE([Total Profit], [Total Sales], 0) * 100
